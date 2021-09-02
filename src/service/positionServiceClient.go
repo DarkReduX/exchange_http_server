@@ -4,14 +4,11 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
-	"fmt"
 	log "github.com/sirupsen/logrus"
 	"google.golang.org/grpc"
 	"main/src/internal/data"
 	pb "main/src/internal/protocol"
 	"main/src/internal/repository"
-	"strconv"
-	"strings"
 	"time"
 )
 
@@ -26,7 +23,8 @@ func connectPositionService(URI string) (*grpc.ClientConn, pb.PositionServiceCli
 
 	return conn, client
 }
-func OpenPosition(price data.SymbolPrice, isBay bool) (string, error) {
+
+func OpenPosition(price data.SymbolPrice, isBay bool, token string) (*data.Position, error) {
 	conn, client := connectPositionService("localhost:8082")
 	ctx, cancel := context.WithTimeout(context.Background(), time.Second*20)
 	defer cancel()
@@ -42,38 +40,34 @@ func OpenPosition(price data.SymbolPrice, isBay bool) (string, error) {
 			Uuid:   price.Uuid,
 			Ask:    price.Ask,
 			Bid:    price.Bid,
-			Token:  repository.Repository.UserToken,
+			Token:  token,
 		})
 	if err != nil {
 		log.Error(err)
-		return "", err
+		return nil, err
 	}
 	if res.Message == "FAIL" {
-		return res.Message, errors.New("Couldn't open position because this data is not actual ")
+		return nil, errors.New("Couldn't open position because this data is not actual ")
 	}
-	posKey := strings.Join([]string{strconv.FormatInt(price.Uuid, 10), price.Symbol}, "-")
 	var openCost float32
 	if isBay {
 		openCost = price.Ask
 	} else {
 		openCost = price.Bid
 	}
-	repository.Repository.Positions[posKey] = data.Position{
+
+	openedPosition := &data.Position{
 		UUID:   price.Uuid,
 		Symbol: price.Symbol,
 		Open:   openCost,
 		Close:  0,
 		IsBay:  isBay,
 	}
-	//repository.Repository.GeneralPnl += repository.Repository.Positions[posKey].PNL(price)
-	log.WithFields(log.Fields{
-		"position": repository.Repository.Positions[posKey],
-	}).Info("successful opened position")
-	return res.Message, nil
+
+	return openedPosition, nil
 }
 
-func ClosePosition(position data.Position) (string, error) {
-	posPnl := position.PNL(repository.Repository.Data[position.Symbol])
+func ClosePosition(position data.Position, token string) (string, error) {
 	conn, client := connectPositionService("localhost:8082")
 	ctx, cancel := context.WithTimeout(context.Background(), time.Second*20)
 	defer cancel()
@@ -82,6 +76,7 @@ func ClosePosition(position data.Position) (string, error) {
 			log.Error(err)
 		}
 	}()
+
 	var closePrice float32
 	if position.IsBay {
 		closePrice = repository.Repository.Data[position.Symbol].Bid
@@ -92,7 +87,7 @@ func ClosePosition(position data.Position) (string, error) {
 		&pb.PositionCloseReq{
 			Symbol:     position.Symbol,
 			Id:         position.UUID,
-			Token:      repository.Repository.UserToken,
+			Token:      token,
 			Isbay:      position.IsBay,
 			ClosePrice: closePrice,
 		})
@@ -100,10 +95,6 @@ func ClosePosition(position data.Position) (string, error) {
 		return "", err
 	}
 	if res.Message == "OK" {
-		log.Info("Successful closed position")
-		repository.Repository.Balance += posPnl
-		repository.Repository.GeneralPnl -= posPnl
-		delete(repository.Repository.Positions, fmt.Sprintf("%d-%s", position.UUID, position.Symbol))
 		return "", err
 	}
 	return "", errors.New("Couldn't close position ")
@@ -165,7 +156,7 @@ func Donate(val float32) error {
 	return err
 }
 
-func GetUserData() error {
+func GetUserData(token string) ([]data.Position, error) {
 	conn, client := connectPositionService("localhost:8082")
 	ctx, cancel := context.WithTimeout(context.Background(), time.Second*2)
 	defer cancel()
@@ -174,14 +165,37 @@ func GetUserData() error {
 			log.Error()
 		}
 	}()
-	res, err := client.GetUserData(ctx, &pb.Token{Token: repository.Repository.UserToken})
+	res, err := client.GetUserData(ctx, &pb.Token{Token: token})
 	if err != nil {
-		return err
+		return nil, err
 	}
-	err = json.Unmarshal(res.Positions, &repository.Repository.Positions)
+
+	positions := make(map[string]data.Position)
+	err = json.Unmarshal(res.Positions, &positions)
 	if err != nil {
-		return err
+		return nil, err
 	}
-	repository.Repository.Balance = res.Balance
-	return nil
+
+	positionsResult := make([]data.Position, 0, 10)
+	for _, v := range positions {
+		positionsResult = append(positionsResult, v)
+	}
+
+	return positionsResult, err
+}
+
+func GetUserBalance(token string) (float32, error) {
+	conn, client := connectPositionService("localhost:8082")
+	ctx, cancel := context.WithTimeout(context.Background(), time.Second*2)
+	defer cancel()
+	defer func() {
+		if err := conn.Close(); err != nil {
+			log.Error()
+		}
+	}()
+	res, err := client.GetUserBalance(ctx, &pb.Token{Token: token})
+	if err != nil {
+		return 0, err
+	}
+	return res.Balance, err
 }
