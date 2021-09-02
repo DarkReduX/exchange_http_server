@@ -15,12 +15,17 @@ service PositionService {
   rpc Login(LoginReq) returns(LoginResp);
   rpc Logout(Token) returns (Response);
   rpc GetUserData(Token) returns(UserData);
+  rpc GetUserBalance(Token) returns(Balance);
   rpc Donate(DonateValue) returns(Response);
 }
 
 message DonateValue {
   float val = 1;
   string token = 2;
+}
+
+message Balance {
+  float balance = 1;
 }
 
 message UserData {
