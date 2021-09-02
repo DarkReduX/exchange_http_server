@@ -12,7 +12,7 @@ type Position struct {
 	Symbol string  `json:"symbol"`
 	Open   float32 `json:"open"`
 	Close  float32 `json:"close"`
-	IsBay  bool    `json:"isbay"`
+	IsBay  bool    `json:"is_bay"`
 }
 
 func (p Position) PNL(lastPrice SymbolPrice) float32 {
@@ -20,4 +20,15 @@ func (p Position) PNL(lastPrice SymbolPrice) float32 {
 		return p.Open - lastPrice.Bid
 	}
 	return lastPrice.Ask - p.Open
+}
+
+type LogInRequest struct {
+	Username string `json:"username"`
+	Password string `json:"password"`
+}
+
+type OpenPosRequest struct {
+	Symbol string `json:"symbol"`
+	IsBay  bool   `json:"isbay"`
+	Token  string `json:"token"`
 }
