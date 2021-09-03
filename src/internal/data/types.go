@@ -30,5 +30,4 @@ type LogInRequest struct {
 type OpenPosRequest struct {
 	Symbol string `json:"symbol"`
 	IsBay  bool   `json:"isbay"`
-	Token  string `json:"token"`
 }

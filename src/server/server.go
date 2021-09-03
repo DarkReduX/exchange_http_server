@@ -9,6 +9,7 @@ import (
 	"main/src/internal/repository"
 	"main/src/service"
 	"net/http"
+	"strings"
 )
 
 type Server struct {
@@ -80,7 +81,8 @@ func getPriceUpdates(c echo.Context) error {
 }
 
 func getUserPositions(c echo.Context) error {
-	token := c.QueryParam("token")
+	token := c.Request().Header.Get("Authorization")
+	token = strings.TrimPrefix(token, "Bearer ")
 	if token == "" {
 		return echo.ErrUnauthorized
 	}
@@ -100,11 +102,13 @@ func openUserPosition(c echo.Context) error {
 		return echo.ErrBadRequest
 	}
 
-	if request.Token == "" {
+	token := c.Request().Header.Get("Authorization")
+	token = strings.TrimPrefix(token, "Bearer ")
+	if token == "" {
 		return echo.ErrUnauthorized
 	}
 
-	res, err := service.OpenPosition(repository.Repository.Data[request.Symbol], request.IsBay, request.Token)
+	res, err := service.OpenPosition(repository.Repository.Data[request.Symbol], request.IsBay, token)
 	if err != nil {
 		return echo.ErrBadRequest
 	}
@@ -118,8 +122,8 @@ func closeUserPosition(c echo.Context) error {
 		return echo.ErrBadRequest
 	}
 
-	token := c.QueryParam("token")
-
+	token := c.Request().Header.Get("Authorization")
+	token = strings.TrimPrefix(token, "Bearer ")
 	if token == "" {
 		return echo.ErrUnauthorized
 	}
@@ -131,7 +135,8 @@ func closeUserPosition(c echo.Context) error {
 }
 
 func getUserBalance(c echo.Context) error {
-	token := c.QueryParam("token")
+	token := c.Request().Header.Get("Authorization")
+	token = strings.TrimPrefix(token, "Bearer ")
 	balanceResp, err := service.GetUserBalance(token)
 	if err != nil {
 		return echo.ErrUnauthorized
