@@ -92,7 +92,12 @@ func getUserPositions(c echo.Context) error {
 		return c.JSON(http.StatusInternalServerError, nil)
 	}
 
-	return c.JSON(http.StatusOK, result)
+	response := make([]data.PositionResponse, 0, len(result))
+	for _, v := range result {
+		response = append(response, data.PositionResponse{Pos: v, Pnl: v.PNL(repository.Repository.Data[v.Symbol])})
+	}
+
+	return c.JSON(http.StatusOK, response)
 }
 
 func openUserPosition(c echo.Context) error {

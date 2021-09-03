@@ -31,3 +31,8 @@ type OpenPosRequest struct {
 	Symbol string `json:"symbol"`
 	IsBay  bool   `json:"isbay"`
 }
+
+type PositionResponse struct {
+	Pos Position `json:"pos"`
+	Pnl float32  `json:"pnl"`
+}
